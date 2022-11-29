@@ -1,4 +1,6 @@
 # Kubernetes Cheat Sheet
+This repo covers a list of Kubernetes commands to perform various tasks.  It's used as a personal reference guide, however feel free to fork or replicate this if you find it helpful.
+
 ## Basic commands:
 <pre>
 kubectl version
