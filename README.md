@@ -1,7 +1,7 @@
 # Kubernetes Cheat Sheet
 This repo covers a list of Kubernetes commands to perform various tasks.  It's used as a personal reference guide, however feel free to fork or replicate this if you find it helpful.
 
-## Basic Commands:
+## Basic Commands
 <pre>
 kubectl version
 kubectl version -o=yaml
@@ -11,31 +11,6 @@ kubectl run hello-minikube
 kubectl get all
 
 kubectl get nodes
-kubectl get pods
-kubectl get pods -o wide
-
-kubectl describe pods
-kubectl describe pod nginx
-
-kubectrl run nginx --image=nginx
-
-kubectl create -f pod-definition.yaml
-kubectl apply -f pod-definition.yaml
-kubectl delete -f pod-definition.yaml
-
-kubectl delete pod pod1 pod2 pod3
-
-kubectl edit pod pod1
-
-kubectl exec --stdin --tty nginx -- /bin/bash
-</pre>
-
-## YAML Kind | Version Examples
-<pre>
-POD = v1
-Service = v1
-ReplicaSet = apps/v1
-Deployment = apps/v1
 </pre>
 
 ## Explain Examples
@@ -46,6 +21,33 @@ kubectl explain replicaset
 kubectl explain replicationcontroller
 kubectl explain deployment
 kubectl explain node
+</pre>
+
+## YAML Kind | Version Examples
+<pre>
+POD = v1
+Service = v1
+ReplicaSet = apps/v1
+Deployment = apps/v1
+</pre>
+
+## Pod Commands
+<pre>
+kubectl get pods
+kubectl get pods -o wide
+kubectl describe pods
+kubectl describe pod nginx
+
+kubectrl run nginx --image=nginx
+
+kubectl create -f pod-definition.yaml
+kubectl apply -f pod-definition.yaml
+kubectl delete -f pod-definition.yaml
+kubectl delete pod pod1 pod2 pod3
+
+kubectl edit pod pod1
+
+kubectl exec --stdin --tty nginx -- /bin/bash
 </pre>
 
 ### Quickly Create Pod Definition YAML Files
