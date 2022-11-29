@@ -8,6 +8,8 @@ kubectl version -o=yaml
 kubectl cluster-info
 kubectl run hello-minikube
 
+kubectl get all
+
 kubectl get nodes
 kubectl get pods
 kubectl get pods -o wide
@@ -46,12 +48,12 @@ kubectl explain deployment
 kubectl explain node
 </pre>
 
-## Quickly Create YAML Deploy Files
+## Quickly Create YAML Pod Files
 <pre>
-kubectl run redis --image=redis --dry-run=client -o yaml > redis-deployment.yaml
+kubectl run redis --image=redis --dry-run=client -o yaml > redis-pod.yaml
 </pre>
 
-## Replication Controllers and Replica Sets
+## Replica Sets & Replication Controllers
 <pre>
 kubectl get replicationcontroller
 kubectl get replicaset
@@ -72,4 +74,17 @@ kubectl scale --replicas=6 replicaset myapp-replicaset
 kubectl scale replicaset myapp-replicaset --replicas=2 
 
 kubectl edit replicaset my-replica-set
+</pre>
+
+## Deployments
+<pre>
+kubectl get deployments
+kubectl describe deployments
+kubectl describe replicaset myapp-replicaset
+
+kubectl create -f deployment.yaml
+kubectl apply -f deployment.yaml
+kubectl delete -f deployment.yaml
+kubectl delete replicaset myapp-replicaset
+
 </pre>
