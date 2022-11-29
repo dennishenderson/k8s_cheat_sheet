@@ -1,7 +1,7 @@
 # Kubernetes Cheat Sheet
 This repo covers a list of Kubernetes commands to perform various tasks.  It's used as a personal reference guide, however feel free to fork or replicate this if you find it helpful.
 
-## Basic commands:
+## Basic Commands:
 <pre>
 kubectl version
 kubectl version -o=yaml
@@ -48,7 +48,7 @@ kubectl explain deployment
 kubectl explain node
 </pre>
 
-## Quickly Create YAML Pod Files
+### Quickly Create Pod Definition YAML Files
 <pre>
 kubectl run redis --image=redis --dry-run=client -o yaml > redis-pod.yaml
 </pre>
@@ -87,4 +87,10 @@ kubectl apply -f deployment.yaml
 kubectl delete -f deployment.yaml
 kubectl delete replicaset myapp-replicaset
 
+kubectl create deployment httpd-frontend --image=httpd:2.4-alpine --replicas=3
+</pre>
+
+### Quickly Create Deployment Definition YAML Files
+<pre>
+kubectl create deployment httpd-web --image=httpd --replicas=3 --dry-run=client -o=yaml > httpd-dry-run-definition.yaml
 </pre>
