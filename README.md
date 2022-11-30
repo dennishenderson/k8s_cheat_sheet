@@ -129,6 +129,7 @@ kubectl rollout undo deployment/myapp-deployment
 
 ## Services
 Three Types of Services: NodePort, ClusterIP, LoadBalancer</br>
+If no service type is chosen, ClusterIP is the (default)</br>
 When serving multiple pods, a service randomly distributes load and uses session affinity
 <pre>
 kubectl get services
