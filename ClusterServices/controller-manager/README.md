@@ -16,7 +16,7 @@ Process that monitors state of various cluster componenets in the Kubernetes Clu
 * CronJob
 
 ## Controller Details
-</pre>
+<pre>
 Node-Controller
 Monitors nodes for desired state config leveraging the kube-apiserver.
 Node Monitor Period = 5s
