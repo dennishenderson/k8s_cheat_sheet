@@ -13,6 +13,13 @@ kubectl get all
 kubectl get nodes
 </pre>
 
+## Namespaces
+<pre>
+kubectl get namespaces
+kubectl get all -n kube-system
+kubectl get pods -n kube-system
+</pre>
+
 ## Explain Examples
 <pre>
 kubectl explain pod
@@ -155,4 +162,13 @@ Default NodePort Range: 30000 - 32767
 ### LoadBalancer
 LoadBalancer service type in a single node lab acts like NodePort, this is really used in most Cloud Providers as a hook to create an external load blancer outside of k8s.
 <pre>
+</pre>
+
+## Kubernetes System Commands
+<pre>
+This command is not working on local Docker may work in production
+kubectl exec etcd-master -n kube-system etcdctl get / --prefix -keys-only
+
+This command gets into the shell of the etcd docker pod with interactive terminal
+kubectl exec --stdin --tty etcd-docker-desktop -n kube-system -- /bin/sh
 </pre>

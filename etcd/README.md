@@ -1,2 +1,0 @@
-# ETCD
-ETCD is a key value database store for linux that Kubernetes relies on to manage the cluster master and nodes.  You can find the latest download instructions [Here](https://github.com/etcd-io/etcd/releases)
