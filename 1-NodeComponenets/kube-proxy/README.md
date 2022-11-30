@@ -1,0 +1,2 @@
+# Kube Proxy
+Process used to watch for services that get created or deleted on the cluster.  This then creates IPRouteTables local to each node that maps the virtual IP of the service the the actual IP of the node containing the running pod(s)
