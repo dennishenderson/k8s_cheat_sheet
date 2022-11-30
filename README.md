@@ -101,8 +101,13 @@ kubectl describe replicaset myapp-replicaset
 
 kubectl create -f deployment.yaml
 kubectl apply -f deployment.yaml
+kubectl apply --force -f deployment.yaml
+kubectl replace -f deployment.yaml
+kubectl replace --force -f deployment.yaml
 kubectl delete -f deployment.yaml
 kubectl delete replicaset myapp-replicaset
+
+kubectl expose deployment nginx --port 80
 
 kubectl create deployment httpd-frontend --image=httpd:2.4-alpine --replicas=3
 
@@ -150,6 +155,13 @@ kubectl delete -f service-definition.yaml
 kubectl delete service myapp-service
 </pre>
 
+### Quickly Create Service Definition YAML Files
+<pre>
+kubectl expose pod redis --port=6379 --name redis-service --dry-run=client -o yaml
+kubectl expose pod nginx --port=80 --name nginx-service --dry-run=client -o yaml
+kubectl create service clusterip redis --tcp=6379:6379 --dry-run=client -o yaml
+</pre>
+
 ### NodePort
 Default NodePort Range: 30000 - 32767
 <pre>
@@ -172,3 +184,50 @@ kubectl exec etcd-master -n kube-system etcdctl get / --prefix -keys-only
 This command gets into the shell of the etcd docker pod with interactive terminal
 kubectl exec --stdin --tty etcd-docker-desktop -n kube-system -- /bin/sh
 </pre>
+
+## Namespaces
+* kube-system - this is the namespace for all the core services of k8s and control plane
+* kube-public - this is designed to be used as a space for pods to be shared across all other namespaces
+* defaul - default namespace used when working with k8s
+
+<pre>
+kubectl get namespaces
+kubectl get ns
+kubectl get all -n kube-system
+kubectl get pods -n kube-system
+
+kubectl get pods --all-namespaces
+kbuectl get all --all-namespaces
+kubectl get pods -A
+kubectl get all -a
+
+kubectl create -f namespace-definition.yaml
+kubectl create namespace dev
+kubectl delete namespace dev
+</pre>
+
+### Changing The Default Namespace
+<pre>
+kubectl config set-contet $(kubectl config current-context) --namespace=dev
+kubectl config set-contet $(kubectl config current-context) --namespace=prod
+</pre>
+
+### Calling Another Namespace From A Pod
+To call the service "db-service" in a "dev" namespace you could format as follows:
+<pre>
+db-service.dev.svc.cluster.local
+
+cluster.local - default domain name
+svc - service subdomain
+dev - namespace
+</pre>
+
+## Resource Quotas
+Resource quotas can be set on namespaces to limit how many resources can be used
+
+<pre>
+
+</pre>
+
+## Scheduler
+If you don't have a scheduler running in a k8s cluster, it's possible to bypass the scheduler and use the nodeName: options key under the spec section of a yaml file.  Optionally you can call the api service directly with a POST see the following link for more details: (https://kubernetes.io/docs/reference/kubernetes-api/cluster-resources/binding-v1/)
