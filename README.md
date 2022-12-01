@@ -41,11 +41,12 @@ Deployment = apps/v1
 ## Pod Commands
 <pre>
 kubectl get pods
+kubectl get po
 kubectl get pods -o wide
 kubectl describe pods
 kubectl describe pod nginx
 
-kubectrl run nginx --image=nginx
+kubectl run nginx --image=nginx
 
 kubectl create -f pod-definition.yaml
 kubectl apply -f pod-definition.yaml
@@ -57,6 +58,16 @@ kubectl edit pod pod1
 kubectl exec --stdin --tty nginx -- /bin/bash
 
 kubectl set image pod/nginx nginx=nginx:1.9.1
+</pre>
+
+### Search For Pods By Their Labels
+<pre>
+kubectl get pods --selector app=nginx
+kubectl get po -l app=nginx
+kubectl get all -l env=prod
+
+Count all the prod web pods:
+kubectl get pods -l 'env=prod,tier=web' --no-headers | wc -l
 </pre>
 
 ### Quickly Create Pod Definition YAML Files
@@ -224,10 +235,71 @@ dev - namespace
 
 ## Resource Quotas
 Resource quotas can be set on namespaces to limit how many resources can be used
-
 <pre>
 
 </pre>
 
 ## Scheduler
 If you don't have a scheduler running in a k8s cluster, it's possible to bypass the scheduler and use the nodeName: options key under the spec section of a yaml file.  Optionally you can call the api service directly with a POST see the following link for more details: (https://kubernetes.io/docs/reference/kubernetes-api/cluster-resources/binding-v1/)
+
+## Taints
+Taints are applied to nodes to prevent resources from being created on them unless there's a "Toleration" that allows it to be added. By default the master node has a Taint applied to prevent pods from running on them. Types of Taint Effects:
+* NoSchedule - New PODs will not be scheduled on the node
+* PreferNoSchedule - System will try to prevent pods from being placed on the node but not garonteed
+* NoExecute - New PODs will not be scheduled on the node, and any existing pods that do not tolerate the taint will be evicted
+<pre>
+kubectl taint nodes node1 app=blue:NoSchedule
+kubectl taint node node01 key=value:NoExecute
+kubectl describe node kubemaster | grep Taint
+</pre>
+
+## Tolerations
+Tolerations are applied to PODs and what allow any taints on nodes to be tolerated aka ignored when scheduling a POD on a cluster. You can add the example block of optional code to the pod-definition.yaml file under the spec dictionary:
+<pre>
+spec:
+  tolerations:
+    - key: "app"
+      operator "Equal"
+      value: "blue"
+      effect: "NoSchedule"
+</pre>
+
+## Node Selectors
+If you want to limit which pods can be assigned to a list of nodes, you can use labels. This has a limitation that you can only select one label type, this is fixed by using Node Affinity.
+<pre>
+kubectl label nodes node01 key=value
+kubectl label nodes node01 size=large
+</pre>
+
+Under the pod-definition you can use the "nodeSelector" optional dictionary under spec:
+<pre>
+spec:
+  nodeSelector:
+  size: large
+</pre>
+
+## Node Affinity
+Allows you to create complex AND OR NOT functionality when choosing which nodes to assign PODs to.  Addtional definition goes under the spec: dictionary.  There are two Affinity Types:
+* requiredDuringSchedulingIgnoredDuringExecution
+* preferredDuringSchedulingIgnoredDuringExecution
+https://kubernetes.io/docs/tasks/configure-pod-container/assign-pods-nodes-using-node-affinity/
+<pre>
+spec:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - matchExpressions:
+          - key: size
+            operator: In
+            values:
+            - Large
+            - Medium
+
+Optionally:
+            operator: NotIn
+            values:
+            - Small
+
+Optionally:
+            operator: Exists
+</pre>
