@@ -517,3 +517,128 @@ volumes:
     secret:
       secretName: app-secret
 </pre>
+
+
+## Init Containers
+Used for a container that needs to run to completion during the initial run of a container.  Perhaps building a file for a web server before it starts, or looking for a DB...  All initContainers are run SEQUENTIALLY before the regular containers run.
+<pre>
+spec:
+  containers:
+  - name: myapp-container
+    image: busybox:1.28
+    command: ['sh', '-c', 'echo The app is running! && sleep 3600']
+  initContainers:
+  - name: init-myservice
+    image: busybox:1.28
+    command: ['sh', '-c', 'until nslookup myservice; do echo waiting for myservice; sleep 2; done;']
+  - name: init-mydb
+    image: busybox:1.28
+    command: ['sh', '-c', 'until nslookup mydb; do echo waiting for mydb; sleep 2; done;']
+</pre>
+
+## Cluster Maintenance
+<pre>
+kube-controller-manager --pod-eviction-timeout=5m0s ...
+
+# Puts a node in maintenance mode and stops and creates processes in other nodes
+kubectl drain node01
+
+# marks the node schedulable again
+kubectl uncordon node01
+
+# marks a node non-scheduable
+kubectl cordon node01
+</pre>
+
+## Kubeadm Upgrade
+You can only upgrade 1 minor release at a time and must do them in order.
+* Release Format - v1.13.2 (major_release.minor_release.patch)
+https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/
+<pre>
+Check the status of your nodes versions:
+kubeadm upgrade plan
+
+1. Download and update kubeadm first
+apt-get upgrade -y kubeadm=1.12.0-00
+
+2. apply the upgrade to your cluster
+kubeadm upgrade apply v1.12.0
+
+3. Upgrade kubelet on the master node
+# Shows the version of the kubelets on the servers:
+kubeadm get nodes
+# download and install kubelet
+apt-get upgrade -y kubelet=1.12.0-00
+systemctl restart kubelet
+
+4. Rolling Updates On Each Worker Node
+# Maintenance Mode for a node, and re-creates workload across other nodes (if possible)
+kubectl drain node01
+# Installs update on each worker node
+apt-get upgrade -y kubeadm=1.12.0-00
+apt-get upgrade -y kubelet=1.12.0-00
+kubeadm upgrade node config --kublet-version v1.12.0
+systemctl restart kubelet
+# Mark node as schedulable
+kubectl uncrodon node01
+# Reapeat this step for remaining nodes
+</pre>
+
+## Backup & Restore
+* kubernetes docs - https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/#backing-up-an-etcd-cluster
+* Restore from etcd backup - https://github.com/etcd-io/website/blob/main/content/en/docs/v3.5/op-guide/recovery.md
+<pre>
+kubectl get all -A -o yaml > all-deploy-services.yaml
+
+# ETCD Service has a directory for all configuration
+--data-dir=/var/lib/etcd
+
+# Snapshot etcd
+ETCDCTL_API=3 etcdctl \
+ snapshot save snapshot.db
+
+# Check snapshot status
+ETCDCTL_API=3 etcdctl \
+  snapshot status snapshot.db
+
+# Restore Server, stop kube-apiserver, restore etcd snapshot
+service kube-apiserver stop
+
+ETCDCTL_API=3 etcdctl \
+  snapshot restore snapshot.db \
+  --data-dir /var/lib/etcd-from-backup
+
+systemctl daemon-reload
+service etcd restart
+service kube-apiserver start
+
+# NOTE: when running the etcd commands you also need to include the following
+  --endpoints=https://127.0.0.1:2379 \
+  --cacert=/etc/etcd/ca.crt \
+  --cert=/etc/etcd/etcd-server.cert \
+  --key=/etc/etcd/etcd-server.key
+
+# Identify ETCD Settings
+kubectl describe pod etcd-controlplane -n kube-system
+
+# Example Backup
+ETCDCTL_API=3 etcdctl snapshot save \
+  --endpoints=https://127.0.0.1:2379 \
+  --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+  --cert=/etc/kubernetes/pki/etcd/server.cert \
+  --key=/etc/kubernetes/pki/etcd/server.key \
+  /tmp/snapshot.db
+
+# Example Restore
+ETCDCTL_API=3 etcdctl snapshot restore \
+  --data-dir /var/lib/etcd-from-backup \
+  /tmp/snapshot.db
+
+# Update static etcd.yaml file to point to the new restore volume
+vim /etc/kubernetes/manifests/etcd.yaml
+# modify hostPath directory
+- hostPath:
+    path: /var/lib/etcd-from-backup
+    type: DirectoryOrCreate
+  name: etcd-data
+</pre>
