@@ -73,6 +73,7 @@ kubectl get pods -l 'env=prod,tier=web' --no-headers | wc -l
 ### Quickly Create Pod Definition YAML Files
 <pre>
 kubectl run redis --image=redis --dry-run=client -o yaml > redis-pod.yaml
+kubectl get pod nginx -o yaml > nginx-definition.yaml
 </pre>
 
 ## Replica Sets & Replication Controllers
@@ -302,4 +303,54 @@ Optionally:
 
 Optionally:
             operator: Exists
+</pre>
+
+## Resource Requirmenets and Limits
+CPU, RAM, and Disk can have requirmenets and limits set on PODs.  Below are some things to consider:
+* CPU - by default 0.5, represents half a vCPU or Core. can be as small as 0.1 or 100m, or optionally 1m (1/1000th of a vCPU)
+* RAM - default max is 512Mi
+CPU can not be overprovisioned, Memory can be overprovisioned, but if it's frequent for a pod it will be terminated. Examples Definitions:
+<pre>
+spec:
+  containers:
+    resources:
+      requests:
+        memory: "1Gi"
+        cpu: 1
+      limits:
+        mempory: "2Gi"
+        cpu: 2
+</pre>
+
+## Daemon Sets
+A Daemon Set is like a Replica Set except that it creates 1 pod per node.  This is useful for things like kube-proxy, networking like weave-net and calico, and log monitoring agents so containers can interact with a local pod to the node.
+<pre>
+kubectl get ds
+kubectl get daemonsets
+kubectl describe daemonsets monitoring-daemon
+
+kubectl create -f daemon-set-definition.yaml
+</pre>
+
+### Quickly Create Daemonset Definition YAML Files
+There's no dry-run for a Daemonset but you can ceate a Deployment, then change the kind and delete the replicas spec.
+<pre>
+kubectl create deployment elasticsearch -n kube-system --image=fluentd-elasticsearch --dry-run=client -o yaml > fluentd.yaml
+vim fluentd.yaml
+kubectl create -f fluentd.yaml
+</pre>
+
+## Static Pods
+Kubelet has the ability to run PODs from a manifest path and try to keep them running without the help of the cluster control-plane.  this is typically under /etc/kubernetes/manifests and gets sent when creating the kublet service on the server with the --pod-manifest-path=/... parameter. </br>
+Static Pods can be easily identified as they have a postfix of -NodeName, for example etcd-controlplane
+<pre>
+docker ps
+
+ps -aux | grep kubectl
+  look for "--config"
+
+cat /var/lib/kubelet/config.yaml
+  staticPodPath: /etc/kubernetes/manifests
+
+ls /etc/kubernetes/manifests/
 </pre>
