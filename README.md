@@ -354,3 +354,166 @@ cat /var/lib/kubelet/config.yaml
 
 ls /etc/kubernetes/manifests/
 </pre>
+
+## Logs & Monitoring
+logging and monitoring in k8s is pretty basic, you need to setup something like promethius or datadog for advanced logging and log file stores.  Logs are stored in memory in the cluster by default, and monitoring is basic.
+<pre>
+Continuous log with -f flag:
+kubectl logs -f pod-name
+
+2 containers in a single pod:
+kubectl logs pod-name container-name
+
+kubectl log pod/pod-name
+kubectl log service-name
+</pre>
+
+Monitoring can be installed using a metrics-server if not already inistalled as a deployment.
+<pre>
+kubectl top node
+kubectl top pod
+</pre>
+
+## Commands & Arguments
+Commands and Arguments can be passed to kubernetes containers just like docker.  They can also override the docker "ENTRYPOINT" and "CMD" commands and arguments.
+* ENTRYPOINT - this is a docer key that represents the command to be run in a container.  The replacement for this in kubernetes is "command" under the containers dictionary
+* CMD - this docker key is replaced by "args" under containers to pass arguments
+<pre>
+spec:
+  containers:
+    - name: nginx
+      image: nginx
+      command: "sleep"
+      args: "5000"
+</pre>
+
+## Environment Variables
+Environment varaibles can be passed as key:value pairs in an array under the spec.containers.env
+<pre>
+spec:
+  containers:
+    - name: nginx
+      image: nginx
+      env:
+        - name: env_var
+          value: some_value
+</pre>
+
+You can pull single environment variables as well from configmaps and secrets
+<pre>
+spec:
+  containers:
+    - name: nginx
+      image: nginx
+      env:
+        name: APP_COLOR
+        valueFrom:
+          configMapKeyRef:
+            name: app-config
+            key: APP_COLOR
+
+spec:
+  containers:
+    - name: nginx
+      image: nginx
+      env:
+        name: DB_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: db-config
+            key: DB_PASSWORD
+</pre>
+
+## ConfigMaps
+ConfigMaps are used as non-sensitive key:value pairs to be used by definition files and resources in your environment.
+https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/
+<pre>
+kubectl get cm
+kubectl get configmaps
+kubectl describe cm
+kubectl describe configmaps
+
+Imperative Commands:
+kubectl create configmap config-name --from-literal=KEY=value
+kubectl create configmap nginx-db --from-literal=DB=redis
+
+kubectl create configmap app-config \
+  app-config --from-literal=APP_COLOR=blue \
+             --from-literal=APP_MOD=prod
+
+kubectl create configmap config-name --from-file=./file-path
+kubectl create configmap app-config --from-file=app_config.properties
+
+Declarative Commands:
+kubectl create -f config-map-definition.yaml
+</pre>
+
+### Using ConfigMaps in pod-definition files:
+You can leverage the spec.containers.envFrom list to call config maps.
+<pre>
+spec:
+  containers:
+    - name: nginx
+      image: nginx
+      envFrom:
+        configMapRef:
+            name: nginx-config
+</pre>
+
+## Secrets
+Secrets are like ConfigMaps except that they are encrypted and used for sensitive data such as usernames and passwords.  There are 3 types of secrets:
+* docker-registry - Create a secret for use with a Docker registry
+* generic - Create a secret from a local file, directory, or literal value
+* tls - Create a TLS secret
+<pre>
+kubectl get secrets
+kubectl describe secrets
+
+Imperative Commands:
+kubectl create secret generic secret-name --from-literal=KEY=value
+kubectl create secret generic secret-mongo-db --from-literal=DB_PASSWORD=abc123
+
+kubectl create secret generic \
+  secret-mongo-db --from-literal=DB_USER=user \
+                  --from-literal=DB_PASSWORD=password
+
+kubectl create secret generic secret-name --from-file=./file-path
+kubectl create secret generic secret-name --from-file=app_config.properties
+
+Declarative Commands:
+kubectl create -f secret-definition.yaml
+</pre>
+
+### Base64 Encoding & Decoding
+To encode your string literals you need to do the following from a termal
+<pre>
+echo -n 'password' | base64
+cGFzc3dvcmQ=
+
+echo -n 'cGFzc3dvcmQ=' | base64 --decode
+password
+</pre>
+
+### Using Secrets in pod-definition files:
+You can leverage the spec.containers.envFrom list to call secrets.
+<pre>
+spec:
+  containers:
+    - name: nginx
+      image: nginx
+      envFrom:
+        secretRef:
+            name: app-confg
+
+env:
+  - name: DB_Password
+    valueFrom:
+      secretKeyRef:
+        name: app-secret
+        key: DB_Password
+
+volumes:
+  - name: app-secret-volume
+    secret:
+      secretName: app-secret
+</pre>
