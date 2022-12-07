@@ -12,11 +12,17 @@ ps -aux | grep kubelet
 </pre>
 
 ## Monitoring
-Kubelet contains a sub componenet known as cAdvisor which sends metrics to the Metrics Server for in-memory logs of CPU, memory, logs data etc.  
+Kubelet contains a sub componenet known as cAdvisor which sends metrics to the Metrics Server for in-memory logs of CPU, memory, logs data etc.  https://github.com/kubernetes-sigs/metrics-server
 
 <pre>
 kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
 
 kubectl top node
 kubectl top pod
+</pre>
+
+## Logging
+<pre>
+kubectl logs -f pod-name
+kbuectl logs pod-name
 </pre>

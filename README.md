@@ -1,5 +1,6 @@
 # Kubernetes Cheat Sheet
-This repo covers a list of Kubernetes commands to perform various tasks.  It's used as a personal reference guide, however feel free to fork or replicate this if you find it helpful.
+This repo covers a list of Kubernetes commands to perform various tasks.  It's used as a personal reference guide, however feel free to fork or replicate this if you find it helpful.  You can also view the official cheat sheet here:
+https://kubernetes.io/docs/reference/kubectl/cheatsheet/
 
 ## Basic Commands
 <pre>
@@ -641,4 +642,344 @@ vim /etc/kubernetes/manifests/etcd.yaml
     path: /var/lib/etcd-from-backup
     type: DirectoryOrCreate
   name: etcd-data
+</pre>
+
+## Multiple Clusters
+When working with clusters you need to change CONTEXTS you can use the following commands to look around:
+<pre>
+kubectl config get-clusters
+kubectl config get-contexts
+kubectl config view
+
+# Change Clusters
+kubectl config use-context {Cluster_Name}
+
+# Find a list of ETCD members:
+ETCDCTL_API=3 etcdctl \
+ --endpoints=https://127.0.0.1:2379 \
+ --cacert=/etc/etcd/pki/ca.pem \
+ --cert=/etc/etcd/pki/etcd.pem \
+ --key=/etc/etcd/pki/etcd-key.pem \
+  member list
+</pre>
+
+## Secure Copy Files
+If you need to move files between nodes use scp
+<pre>
+scp cluster1-controlplane:/opt/cluster1.db /opt
+</pre>
+
+## External etcd server restore
+If you have etcd installed on an external server and not as a pod in staced mode you need to run a few differnet commands
+<pre>
+# copy file to etcd server
+scp /opt/cluster2.db etcd-server:/root
+
+# Restore DB
+etcd-server ~ ➜  ETCDCTL_API=3 etcdctl --endpoints=https://127.0.0.1:2379 --cacert=/etc/etcd/pki/ca.pem --cert=/etc/etcd/pki/etcd.pem --key=/etc/etcd/pki/etcd-key.pem snapshot restore /root/cluster2.db --data-dir /var/lib/etcd-data-new
+
+#update data dir
+vi /etc/systemd/system/etcd.service
+
+# change ownership to let etcd service have run access 
+chown -R etcd:etcd /var/lib/etcd-data-new
+ls -ld /var/lib/etcd-data-new/
+
+# restart service
+systemctl daemon-reload 
+systemctl restart etcd
+</pre>
+
+## Kubernetes Authentication Types
+There are multiple ways you can secure kubernetes.  All authentication (user access) has to be done external to kubernetes
+
+### Basic File Authentication
+The kube-api-server can read a csv file using the below configuration and format
+<pre>
+# Config File on API Server Setup
+--basic-auth-file=user-details.csv
+
+# Sample User Data in CSV
+password1,user1,u0001,group1
+password2,user2,u0002,group2
+password3,user3,u0003,group3
+
+# Call the API server using a curl command
+curl -v -k https://master-node-ip:6443/api/v1/pods -u "user1:password123"
+</pre>
+
+### Token File Authentication
+<pre>
+# Config File on API Server Setup
+--token-auth-file=user-details.csv
+
+# Sample User Data in CSV
+...Some_Hex_Code_For_User_Token...,user1,u0001,group1
+...Some_Hex_Code_For_User_Token...,user2,u0002,group2
+...Some_Hex_Code_For_User_Token...,user3,u0003,group3
+
+# Call the API server using a curl command
+curl -v -k https://master-node-ip:6443/api/v1/pods --header "Authroization: Bearer ...Some_Hex_Code_For_User_Token..."
+</pre>
+
+### SSH Based Authentication
+You can leverage public / private key pairs to secure Kubernetes
+<pre>
+# Create an SSH key pair (id_rsa, id_rsa.pub)
+ssh-keygen
+
+# default public key path on servers
+/.ssh/authorized_keys
+
+# Open SSL Keygen
+openssl genrsa -out my-bank.key 1024
+  Output: my-bank.key
+
+openssl rsa -in my-bank.key -pubout > mybank.pem
+  Output: my-bank.key mybank.pem
+
+# Create a certificate signed request using open ssl
+openssl req -new -key my-bank.key -out my-bank.csr -subj "/C=US/ST=CA/O=MyOrg,Inc./CN=my-bank.com"
+  Output: my-bank.key my-bank.csr
+</pre>
+
+### Generating a CA Certificate SSL Key using openssl
+<pre>
+# Generate Key
+openssl genrsa -out ca.key 2048
+  Output: ca.key
+
+# Certificate Signing Request
+openssl req -new -key ca.key -subj "/CN=KUBERNETES-CA" -out ca.csr
+  Output: ca.csr
+
+# Sign Certificates
+openssl x509 -req -in ca.csr -signkey ca.key -out ca.crt
+  Output: ca.crt
+</pre>
+
+### Generating Admin User SSL Key using openssl
+<pre>
+# Generate Key
+openssl genrsa -out admin.key 2048
+  Output: admin.key
+
+# Certificate Signing Request
+openssl req -new -key admin.key -subj "/CN=kube-admin" -out admin.csr
+  Output: admin.csr
+
+# Sign Certificate Using the ca.crt and ca.key
+openssl x509 -req -in admin.csr -CA ca.crt -CAkey ca.key -out admin.crt
+  Output: ca.crt
+</pre>
+
+### Generating SSL key for the Kube API Server
+Becasue the Kube API Server us called by so many different names you need to use SAN certs (Subject Alternative Name) with multple endpoints.  Possible combinations to call the API server:
+* kubernetes
+* Kubernetes.default
+* kubernetes.defualt.svc
+* kubernetes.default.svc.cluster.local
+* internal ip (10.96.0.1)
+* external ip (172.17.0.87)
+<pre>
+# Generating a CSR for API Server
+openssl req -new -key apiserver.key -subj "/CN=kube-apiserver" -out apiserver.csr -config openssl.cnf
+  Output: apiserver.csr
+
+# Create an openssl.cnf file with the following:
+[req]
+req_extensions = v3_req
+distinguised_name = req_distinguished_name
+[ v3_req ]
+basicConstraints = CA:FALSE
+keyUsage = nonRepudiation,
+subjectAltName = @alt_names
+[alt_names]
+DNS.1 = kubernetes
+DNS.2 = kubernetes.default
+DNS.3 = kubernetes.default.svc
+DNS.4 = kubernetes.default.svc.cluster.local
+IP.1 = 10.96.0.1
+IP.2 = 172.17.0.87
+
+# Sign the csr with the CA cert
+openssl x509 -req -in apiserver.csr -CA ca.crt -CAkey ca.key -out apiserver.crt
+</pre>
+
+### Decoding a certificate to check for issues
+<pre>
+openssl x509 -in /etc/kubernetes/pki/apiserver.crt -text -noout
+</pre>
+
+### Checking for logs with certificate issues
+https://github.com/mmumshad/kubernetes-the-hard-way/tree/master/tools
+<pre>
+# If installed "The Hard Way"
+journalctl -u etcd.service -l
+
+# If installed with kubeadm check the pods
+kubectl logs etcd-master
+
+# If the api server is down, you may need to use Docker
+docker ps -a
+docker logs ...container_id...
+</pre>
+
+## Using the Certificate API in Kubectl
+You can request certificates using the certificate signing request function within kubectl.  This allows you to create certificates for users in a controlled manner.
+https://kubernetes.io/docs/reference/access-authn-authz/certificate-signing-requests/
+<pre>
+# generate rsa key
+openssl genrsa -out jane.key 2048
+
+# sample output of jane.key
+-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEA1BvGW7EPkOrsqlZzDa+pzsvPaLskN7LuCaoTQhniGInZOifF
+...
+IYiXWasR6yIcbC3oRhW4kU1WVCzBSvSTY2y6ocuUab+9PC8CpeXx7g==
+-----END RSA PRIVATE KEY-----
+
+
+# convert key to csr
+openssl req -new -key jane.key -subj "/CN=jane" -out jane.csr
+
+# sample output of jane.csr
+-----BEGIN CERTIFICATE REQUEST-----
+MIICVDCCATwCAQAwDzENMAsGA1UEAwwEamFuZTCCASIwDQYJKoZIhvcNAQEBBQAD
+...
+EazTcnadsmTkm1s/viQBHdIxLmfLQzsn
+-----END CERTIFICATE REQUEST-----
+
+# base64 encode the csr
+cat jane.csr | base64 | tr -d "\n"
+
+# Next create a Certificate Signing Request YAML file
+See (certificates/jane-csr.yaml)
+
+# send the csr to kubernetes
+kubectl apply -f jane-csr.yaml
+
+# view the csr
+kubectl get csr
+
+# approve the csr
+kubectl certificate approve jane
+
+# view the cert
+kubectl get csr jane -o yaml
+
+# base64 decode certificate
+echo "LS0...Qo=" | base64 --decode
+</pre>
+
+## Kube Config
+kubectl by default looks for a $HOME/.kube/config file to pass the server, client-key, client-certificate, and certificate-authority as parameters.  If this file doesn't exist you'd have to pass these items as parameters each time such as this...
+<pre>
+# curl example
+curl https://my-kube-playground:6443/api/v1/pods \
+--key admin.key \
+--cert admin.crt \
+--cacert ca.crt
+
+# kubectl example
+kubectl get pods \
+--server my-kube-playground:6443 \
+--client-key admin.key \
+--client-certificate admin.crt \
+--certificate-authority ca.crt
+
+# if the kubeconf file is somewhere other than ~/.kube/config you can pass it to kubectl
+kubectl get pods --kubeconfig /path/config
+</pre>
+
+### Kube Config Contexts
+You may want to change between kubeconfig contexts or clusters / users
+<pre>
+# view current kube config
+kubectl config view
+kubectl config view --kubeconfig=my-custom-config
+</pre>
+
+## Roles & Role Bindings
+https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+<pre>
+kubectl get roles
+kubectl get rolebindings
+kubectl describe role developer
+kubectl describe rolebinding devuser-developer-binding
+
+kubectl create -f devuser-developer-binding.yaml
+</pre>
+
+Testing access
+<pre>
+kubectl auth can-i create deployments
+kubectl auth can-i delete nodes
+
+kubectl auth can-i create deployments --as dev-user
+kubectl auth can-i create pods --as dev-user
+kubectl auth can-i create pods --as dev-user --namespace test
+</pre>
+
+Create or Edit Roles & role bindings
+<pre>
+kubectl create role developer --verb=list,create,delete --resources=pods
+kubectl create rolebinding dev-user-binding --role=developer --user=dev-user
+
+kubectl edit role developer -n blue
+</pre>
+
+## Namespaced vs Cluster Scoped
+to view a full list of namespace and cluster scoped items use the api-resources function
+<pre>
+kubectl api-resources --namespaced=true
+kubectl api-resources --namespaced=false
+</pre>
+
+## Service Accounts
+<pre>
+kubectl create serviceaccount dashboard-sa
+kubectl get serviceaccount
+kubectl describe serviceaccount dashboard-sa
+kubectl describe secret dashboard-sa-token-kbbdm
+kubectl create token dashboard-sa
+</pre>
+
+## creating a private repo
+<pre>
+docker login private-registory.io
+docker run private-registry.io/apps/internal-app
+
+kubectl create secret docker-registry regcred \
+--docker-server= private-registry.io \
+--docker-username= registry-user \
+--docker-password= registry-password \
+--docker-email= registry-user@org.com
+
+spec:
+  containers:
+  - name: nginx
+    image: private-registry.io/apps/internal-app
+  imagePullSecrets:
+  - name: regcred
+</pre>
+
+## Network Policies
+<pre>
+kubectl get networkpolicies
+kubectl get netpol
+kubectl 
+</pre>
+
+## Tool to quickly switch between cluster contexts and namespaces
+https://github.com/ahmetb/kubectx
+
+## Volumes
+To map volumes to the local storage you can just use the volumes container see (volumes/volume-pod.yaml).  Additionally you can use AWS EBS using the block of code:
+<pre>
+volumes:
+- name: data-volume
+  awsElasticBlockStore:
+    volumeID: {volume-id}
+    fsType: ext4
 </pre>
