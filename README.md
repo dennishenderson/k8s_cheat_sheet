@@ -983,3 +983,30 @@ volumes:
     volumeID: {volume-id}
     fsType: ext4
 </pre>
+
+## Persistent Volumes
+See (volumes/pv-definition.yaml)
+<pre>
+kubectl create -f pv-definition.yaml
+kubectl get persistentvolume
+</pre>
+
+## Persistent Volume Claims
+See (volumes/pvc-definition.yaml)</br>
+By default persistent volumes are set to be Retained, you can modify this using the persistentVolumeReclaimPolicy:
+<pre>
+kubectrl get persistentvolumeclaim
+kubectrl get pvc
+
+kubectl create -f pvc-definition.yaml
+
+kubectl delete persistentvolumeclaim myclaim
+kubectl delete pvc myclaim
+</pre>
+
+## Storage Classes
+If you were to use PVC's for a cloud provider like Google Cloud, you'd have to manually create the volume every time.  This is why Storage Classes exist.  They allow for dynamically provisioning storage.  You don't need a PV when using Storage Classes. See (volumes/sc-definition.yaml) and (volumes/pvc-sc-definition.yaml)
+<pre>
+kubectl get sc
+kubectl get storageclasses
+</pre>
