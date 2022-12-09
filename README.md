@@ -1010,3 +1010,199 @@ If you were to use PVC's for a cloud provider like Google Cloud, you'd have to m
 kubectl get sc
 kubectl get storageclasses
 </pre>
+
+## Linux Networking Basics
+<pre>
+# System A Routing
+route
+ip route add 192.168.2.0/24 via 192.168.1.1
+
+# System B Routing
+route
+ip route add 192.168.1.0/24 via 192.168.2.1
+
+# Default Route To Internet
+ip route add default via 192.168.2.1
+
+# Allowing forwarding packets between eth0, eth1, etc. interfaces
+cat /proc/sys/net/ipv4/ip_forward
+# 0 - no forward
+# 1 - forwarding allowed
+echo 1 > /proc/sys/net/ipv4/ip_forward
+
+# for permenant changes modify /etc/sysctl.conf
+net.ipv4.ip_forward = 1
+
+# list and modify interfaces on the host
+ip link
+
+# list the ip addresses assigned to interfaces
+ip addr
+
+# set ip addresses on the interfaces
+ip addr add 192.168.1.10/24 dev eth0
+
+# To persist changes update the /etc/network/interfaces file
+
+# view routing table
+ip route
+
+# list network interfaces
+ifconfig
+
+# local dns lookup (host files)
+/etc/hosts
+192.168.1.11    db
+
+# find local host name
+hostname
+
+# find dns server
+cat /etc/resolv.conf
+
+# to switch order of local host files vs dns you can modify this file. You can also put other name servers in
+nameserver  8.8.8.8
+
+# you can add domain name resolutions here as well to resolve web to web.company.local
+search company.local
+
+# more commands
+nslookup
+dig
+</pre>
+
+## Linux Namespaces
+namespaces in linux allow you to isolate networks such as containers from the main OS
+<pre>
+# create a new namespace
+ip netns add red
+ip netns add blue
+ip netns
+
+# run commands to the separate namespace
+ip link   # root
+ip netns exec red ip link   # red namespace
+ip -n red link   # same as above
+
+arp
+ip netns exec red arp
+
+# if you want to link to separate virtual namespaces to one other...
+ip link add veth-red type veth peer name veth-blue   # create virtual link route
+iplink set veth-red netns red   # assign virtual nic to a namespace red
+iplink set veth-blue netns blue # assign virtual nic to a namespace blue
+ip -n red addr add 192.168.15.1 dev veth-red   # assign red vnic an ip
+ip -n blue addr add 192.168.15.2 dev veth-blue   # assign blue vnic an ip
+ip -n red link set veth-red up   # bring up the red vnic
+ip -n blue link set veth-blue up   # bring up the blue vnic
+ip netns exec red ping 192.168.15.2   # test connectivity from red to blue
+ip netns exec red arp   # sees the blue ip in it's history
+ip netns exec blue arp   # sees the red ip in it's history
+</pre>
+
+The above works well when only connecting a few componenets to one another, but if you need to connect several you'll need to setup a virtual switch.  there are several options in linux such as Linux Bridge
+<pre>
+# creates a virtual network interface to be used as the virtual switch
+ip link addr v-net-0 type bridge   # creates a vitual switch
+ip link   # shows the virtual eth
+iplink set dev v-net-0 up   # brings up the switch
+
+# now point the existing namespace vnics to this new virtual switch interface for routing between devices
+ip -n red link del veth-red   # deletes the veth-red link route
+ip link add veth-red type veth peer name veth-red-br   # creates a vritual bridge nic to connect to vswitch
+ip link add veth-blue type veth peer name veth-blue-br  # creates a virtual bridge nic to connect to vswitch
+ip link set veth-red netns red   # assign virtual nic to a namespace red
+ip link set veth-red-br master v-net-0   # assigns the virtual nic to the virtual switch
+ip link set veth-blue netns blue   # assign virtual nic to a namespace blue
+ip link set veth-blue-br master v-net-0   # assigns the virtual nic to the virtual switch
+ip -n red addr add 192.168.15.1 dev veth-red   # assign red vnic an ip
+ip -n blue addr add 192.168.15.2 dev veth-blue   # assign blue vnic an ip
+ip -n red link set veth-red up   # bring up the red vnic
+ip -n blue link set veth-blue up   # bring up the blue vnic
+
+# if you'd like to connect the host server to the private networks you can add an ip to the virtual swtich
+ip addr add 192.168.15.5/24 dev v-net-0   # assigns ip to vswitch to route traffic from host server to virtual namespace resources
+
+# connecting virtual networks to an external network outside the host... First create a route from the virtual nic to the virtual switch, then create a nat rule on the local host
+ip netns exec blue ip route add 192.168.1.0/24 via 192.168.15.5   # route on virtual nic
+iptables -t nat -A POSTROUTING -s 192.168.15.0/24 -j MASQUERADE   # creates nat rule to use the host as the routing
+ip netns exec blue ping 192.168.1.3   # allows pinging from vnic blue namespace to external ip in another subnet
+
+# connecting vnic namespace to the internet add another route to the namespace
+ip netns exec blue ip route add default via 192.168.15.5
+ip netns exec blue ping 8.8.8.8
+
+# connecting from external network to internal vnic namespace, you can create a portforwarding rule on the host
+iptables -t nat -A PREROUTING --dport 80 --to-destination 192.168.15.2:80 -j DNAT
+</pre>
+
+## Docker Networking
+There are 3 modes of networks for docker
+* none - no network connectivity
+* host - shares the same ports as the local host
+* bridge - uses the virtual switch described in linux networking
+<pre>
+docker network ls
+
+ip link
+</pre>
+
+## Kubernetes Networking
+<pre>
+ifconfig -a
+cat /etc/network/interfaces
+ifconfig eth0
+ip link
+ip route
+route
+
+# find the port a pod is running on
+netstat -natulp | grep kube-scheduler
+
+# run a command on a remote node and return it to the local server
+ssh node01 ifconfig eth0
+
+# ports etcd is listening on
+netstat -anp | grep etcd
+netstat -natulp | grep etcd | grep LISTEN
+</pre>
+
+## CNI files
+kubelet you can see this info
+<pre>
+--network-plugin=cin
+--cni-bin-dir=/opt/cni/bin
+--cni-conf-dir=/etc/cni/net.d
+
+ps -aux | grep kubelet
+
+# executables
+ls /opt/cni/bin
+
+# configs
+ls /etc/cni/net.d
+</pre>
+
+## IPAM
+This is the responsibility of the CNI Plugin
+<pre>
+cat /etc/cni/net.d/net-script.conf
+
+"ipam": {
+  "type": "host-local",
+  "subnet": "10.244.0.0/16",
+  "routes": [
+    { "dst": "0.0.0.0/0" }
+  ]
+}
+</pre>
+
+Weave uses 10.32.0.0/12
+
+## Services Networking
+kube-proxy is the controller that manages services.  It does this through iptables to forward traffic from one IP to another IP.
+<pre>
+# you can view the service cluster ip range in kube-api-server
+kube-api-server --service-cluster-ip-range ipNet (Default: 10.0.0.0/24)
+ps aux | grep kube-api-server
+</pre>
