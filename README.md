@@ -1205,4 +1205,52 @@ kube-proxy is the controller that manages services.  It does this through iptabl
 # you can view the service cluster ip range in kube-api-server
 kube-api-server --service-cluster-ip-range ipNet (Default: 10.0.0.0/24)
 ps aux | grep kube-api-server
+
+# you can view the nat rule on the host here
+iptables -L -t nat | grep db-service
+
+# you can view the changes in the kube-proxy log
+cat /var/log/kube-proxy.log
+</pre>
+
+## DNS
+DNS follows the following hierarchy
+<pre>
+# service
+service_name.namespace.svc.cluster.local
+web-service.apps.svc.cluster.local
+nginx.default.svc.cluster.local
+
+# pods - not enabled by default also doesn't use pod name, uses ip address with - instead of .
+10-244-2-5.namespace.pod.cluster.local
+10-244-2-5.apps.pod.cluster.local
+10-244-2-6.default.pod.cluster.local
+</pre>
+
+## CoreDNS
+<pre>
+./Coredns
+cat /etc/coredns/Corefile
+
+configuration is passed using a config map to core dns
+kubectl get configmaps -n kube-system coredns -o yaml
+kubectl get pods -n kube-system coredns-... -o yaml
+</pre>
+
+## Ingress
+Ingress requires an ingress controller such as istio or nginx-ingress-controller.
+<pre>
+kubectl get ingress
+kubectl get ingressclasses
+kubectl get all -A | grep ingress
+
+kubectl create ingress ingress-pay -n critical-space --rule="/pay=pay-service:8080"
+
+kubectl expose deploy ingress-controller -n ingress-space --name ingress --port=80 --target=80 --type NodePort
+
+# ingress redirect annotations under metadata.annotations
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
 </pre>
