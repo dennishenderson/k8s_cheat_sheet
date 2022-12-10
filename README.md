@@ -1254,3 +1254,70 @@ metadata:
     nginx.ingress.kubernetes.io/rewrite-target: /
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
 </pre>
+
+## Installing Kubernetes with Kubeadm
+If for some reason you lose the post install copy commands with your token, you can re-create one with kubeadm to join a node to a cluster using the following command
+<pre>
+kubeadm token create --print-join-command
+</pre>
+
+## Troubleshooting Tips
+App Troubleshooting
+<pre>
+# save typing by creating an alias to type k instead of kubectl
+alias k=kubectl
+
+# set the current namespace to speed things up
+kubectl config set-context --current --namespace=alpha
+
+# start from top to bottom or bottom to top
+check port on host
+check 1st service
+check 1st tier app/deployment
+check 1st tier secrets/configmaps
+check 2nd tier service
+check 2nd tier app/deployment
+check 2nd tier secrets/configmaps
+</pre>
+
+## Control Plane Troubleshooting
+<pre>
+# stacked topology
+kubectl get nodes
+kubectl get pods
+kubectl get pods -n kube-system
+
+# if installed as services...
+service kube-apiserver status
+service kube-controller-manager status
+service kube-scheduler status
+service kubelet status
+service kube-proxy status
+
+# check the logs for stacked topology
+kubectl logs kube-apiserver-master -n kube-system
+
+# logs for services
+sudo journalctl -u kube-apiserver
+</pre>
+
+## Worker Node Troubleshooting
+<pre>
+kubectl get nodes
+kubectl describe node worker-1
+
+# cpu check
+top
+
+# disck space check
+df -h
+
+# status of the kubelet service
+service kubelet status
+
+# kubelet logs
+sudo journalctl -u kubelet
+
+# check certificates
+openssl x509 -in /var/lib/kubelet/worker-1.crt -text
+</pre>
