@@ -1321,3 +1321,8 @@ sudo journalctl -u kubelet
 # check certificates
 openssl x509 -in /var/lib/kubelet/worker-1.crt -text
 </pre>
+
+## Networking Troubleshooting
+Be careful when troubleshooting things like kube-proxy.  you can mount a file to a what's stored in the config-map.  So it's not actually a file your using, but the config map itself that you won't find anywhere in the system.
+<pre>
+</pre>
